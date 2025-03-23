@@ -1,0 +1,12 @@
+
+/app/src/main/java/com/example/mymovies/data/util/ApiConstants.kt
+*.iml
+.gradle
+.idea
+.DS_Store
+build
+captures
+.externalNativeBuild
+.cxx
+local.properties
+xcuserdata
