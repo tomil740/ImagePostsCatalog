@@ -1,6 +1,6 @@
 package com.tomiappdevelopment.imagepostscatalog.data
 
-import com.tomiappdevelopment.imagepostscatalog.BuildConfig
+import android.util.Log
 import com.tomiappdevelopment.imagepostscatalog.data.local.PostDao
 import com.tomiappdevelopment.imagepostscatalog.data.maper.toDomain
 import com.tomiappdevelopment.imagepostscatalog.data.maper.toEntity
@@ -10,28 +10,25 @@ import com.tomiappdevelopment.imagepostscatalog.domain.modules.Post
 import com.tomiappdevelopment.imagepostscatalog.domain.util.DataError
 import com.tomiappdevelopment.imagepostscatalog.domain.util.Error
 import com.tomiappdevelopment.imagepostscatalog.domain.util.Result
-import kotlinx.coroutines.delay
+import com.tomiappdevelopment.imagepostscatalog.domain.util.retry
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
 
 class PostRepositoryImpl(private val postDao: PostDao,
                          private val postApiService: PostApiService
 ): PostRepository {
 
     override suspend fun fetchNewPage(page: Int): Result<Boolean, Error> {
-        val existingPosts = postDao.getPostsByPage(10, (page - 1) * 10).firstOrNull()
-        if (!existingPosts.isNullOrEmpty()) {
-            return Result.Success(true)
-        }
+        return withContext(Dispatchers.Main) {
+            val existingPosts = postDao.getPostsByPage(10, (page - 1) * 10).firstOrNull()
+            if (!existingPosts.isNullOrEmpty()) {
+                return@withContext Result.Success(true) // Skip fetching if cached
+            }
 
-        return try {
-            val response = postApiService.getPosts(apiKey = "13398314-67b0a9023aca061e2950dbb5a", page = page)
-            val posts = response.hits.map { it.toDomain().toEntity() }
-            postDao.upsertPosts(posts)
-            Result.Success(true)
-        } catch (e: Exception) {
-            Result.Error(DataError.Network.UNKNOWN)
+            fetchAndUpdatePosts(page)
         }
     }
 
@@ -53,6 +50,43 @@ class PostRepositoryImpl(private val postDao: PostDao,
         postDao.deleteAllPosts()
     }
 
+    // Fetch + update for WorkManager or initial load
+    override suspend fun fetchAndUpdatePosts(page: Int): Result<Boolean, Error> {
+        return withContext(Dispatchers.Main) {
+            try {
+                retry(times = 3, delayMillis = 2000) {
+                    val response = postApiService.getPosts(
+                        apiKey = "13398314-67b0a9023aca061e2950dbb5a",
+                        page = page
+                    )
+
+                    if (response.isSuccessful) {
+                        val posts = response.body()?.hits
+                            ?.filter { it.likes > 50 && it.comments > 50 }
+                            ?.map { it.toDomain().toEntity() }
+                            ?: emptyList()
+
+                        if (posts.isNotEmpty()) {
+                            postDao.deleteAllPosts() // Clear existing data for full refresh
+                            postDao.upsertPosts(posts)
+                            return@retry Result.Success(true)
+                        } else {
+                            throw Exception("Empty or invalid data received from server.")
+                        }
+                    } else {
+                        throw Exception("Failed to fetch posts: ${response.code()}")
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("PostRepository", "Error fetching and updating posts", e)
+                return@withContext Result.Error(DataError.Network.UNKNOWN)
+            }
+        }
+    }
+}
+
+
+
     // Simulated function to get some dummy posts (fake API response)
     private fun fakePosts(page: Int): List<Post> {
         return List(10) { index ->
@@ -64,4 +98,3 @@ class PostRepositoryImpl(private val postDao: PostDao,
             )
         }
     }
-}

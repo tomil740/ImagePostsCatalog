@@ -13,6 +13,7 @@ import kotlinx.coroutines.launch
 import com.tomiappdevelopment.imagepostscatalog.domain.util.Result
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
 
@@ -24,9 +25,9 @@ class PostsCatalogViewModel(
     private val _uiState = MutableStateFlow(PostCatalogUiState())
     val uiState: StateFlow<PostCatalogUiState> get() = _uiState
 
-    // Shared flow for error handling
+    // SharedFlow for error messages
     private val _errorState = MutableSharedFlow<String>(replay = 1)
-    val errorState = _errorState
+    val errorState: SharedFlow<String> get() = _errorState
 
     private val _currentPage = MutableStateFlow<Int>(1)
 

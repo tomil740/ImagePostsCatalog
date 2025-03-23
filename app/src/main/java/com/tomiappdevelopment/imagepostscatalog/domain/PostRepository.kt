@@ -16,4 +16,7 @@ interface PostRepository {
     suspend fun upsertPosts(posts: List<Post>)
 
     suspend fun deleteAllPosts()
+
+    suspend fun fetchAndUpdatePosts(page: Int): Result<Boolean, Error>
+
 }

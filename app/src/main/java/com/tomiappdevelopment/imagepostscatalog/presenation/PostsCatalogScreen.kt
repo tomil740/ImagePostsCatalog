@@ -13,6 +13,8 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -20,6 +22,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -32,6 +35,14 @@ fun PostsCatalogScreen(viewModel: PostsCatalogViewModel) {
     val state by viewModel.uiState.collectAsState()
     val errorState by viewModel.errorState.collectAsState(initial = "")
 
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    // Collect error state from ViewModel and display in a Snackbar
+    LaunchedEffect(key1 = errorState) {
+        if (errorState.isNotEmpty()) {
+            snackbarHostState.showSnackbar(errorState)
+        }
+    }
 
     val listState = rememberLazyListState()
 
@@ -51,6 +62,9 @@ fun PostsCatalogScreen(viewModel: PostsCatalogViewModel) {
                 colors = TopAppBarDefaults.smallTopAppBarColors(containerColor = MaterialTheme.colorScheme.primary)
             )
         },
+        snackbarHost = {
+            SnackbarHost(hostState = snackbarHostState)
+        },
         content = { paddingValues ->
             Box(
                 modifier = Modifier
@@ -60,14 +74,6 @@ fun PostsCatalogScreen(viewModel: PostsCatalogViewModel) {
                 if (state.isLoading && state.posts.isEmpty()) {
                     CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
                 } else {
-                    if (errorState.isNotEmpty()) {
-                        Text(
-                            text = "Error: $errorState",
-                            color = Color.Red,
-                            modifier = Modifier.align(Alignment.Center)
-                        )
-                    }
-
                     LazyColumn(
                         state = listState,
                         modifier = Modifier.fillMaxSize()
