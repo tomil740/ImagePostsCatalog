@@ -16,4 +16,18 @@ interface PostRepository {
     suspend fun upsertPosts(posts: List<Post>)
 
     suspend fun deleteAllPosts()
+
+
+
+
+
+
+    suspend fun fetchPostsByLikes(page: Int): Result<Boolean, Error>
+
+    fun getPostsByLikes(page: Int): Flow<List<Post>>
+
+    suspend fun deleteAllPostsByLikes()
+
+
+
 }

@@ -9,6 +9,8 @@ interface PostApiService {
     suspend fun getPosts(
         @Query("key") apiKey: String,
         @Query("page") page: Int,
-        @Query("per_page") perPage: Int = 10
+        @Query("per_page") perPage: Int = 50,
+        @Query("editors_choice") editorsChoice: Boolean = true,
+        @Query("order") order: String = "popular"
     ): PostResponse
 }
