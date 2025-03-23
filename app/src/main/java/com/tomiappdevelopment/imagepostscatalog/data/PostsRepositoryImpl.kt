@@ -1,16 +1,16 @@
 package com.tomiappdevelopment.imagepostscatalog.data
 
+import android.util.Log
 import com.tomiappdevelopment.imagepostscatalog.data.local.PostDao
-import com.tomiappdevelopment.imagepostscatalog.data.maper.toDomainPost
-import com.tomiappdevelopment.imagepostscatalog.data.maper.toDomainPostByLike
+import com.tomiappdevelopment.imagepostscatalog.data.maper.toDomain
 import com.tomiappdevelopment.imagepostscatalog.data.maper.toEntity
-import com.tomiappdevelopment.imagepostscatalog.data.maper.toPostByLikesEntity
 import com.tomiappdevelopment.imagepostscatalog.data.remote.PostApiService
 import com.tomiappdevelopment.imagepostscatalog.domain.PostRepository
 import com.tomiappdevelopment.imagepostscatalog.domain.modules.Post
 import com.tomiappdevelopment.imagepostscatalog.domain.util.DataError
 import com.tomiappdevelopment.imagepostscatalog.domain.util.Error
 import com.tomiappdevelopment.imagepostscatalog.domain.util.Result
+import com.tomiappdevelopment.imagepostscatalog.domain.util.retry
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.firstOrNull
@@ -22,21 +22,13 @@ class PostRepositoryImpl(private val postDao: PostDao,
 ): PostRepository {
 
     override suspend fun fetchNewPage(page: Int): Result<Boolean, Error> {
-        val existingPosts = postDao.getNewPostsByPage(10, (page - 1) * 10).firstOrNull()
-        if (!existingPosts.isNullOrEmpty()) {
-            return Result.Success(true)
-        }
+        return withContext(Dispatchers.Main) {
+            val existingPosts = postDao.getPostsByPage(10, (page - 1) * 10).firstOrNull()
+            if (!existingPosts.isNullOrEmpty()) {
+                return@withContext Result.Success(true) // Skip fetching if cached
+            }
 
-        return try {
-            val response = postApiService.getPosts(apiKey = "13398314-67b0a9023aca061e2950dbb5a", page = page)
-            val posts = response.hits
-                .filter { it.comments > 50 && it.likes > 50 }
-                // Filter posts with >50 comments and >50 likes
-                .map { it.toDomain().toEntity() }
-            postDao.upsertPosts(posts)
-            Result.Success(true)
-        } catch (e: Exception) {
-            Result.Error(DataError.Network.UNKNOWN)
+            fetchAndUpdatePosts(page)
         }
     }
 
@@ -45,7 +37,7 @@ class PostRepositoryImpl(private val postDao: PostDao,
         val offset = (page - 1) * limit  // Calculate offset for pagination
 
         // Fetch posts from the local database (cache)
-        return postDao.getNewPostsByPage(limit, offset).map { it.toDomainPost() }
+        return postDao.getPostsByPage(limit, offset).map { it.toDomain() }
     }
 
     override suspend fun upsertPosts(posts: List<Post>) {
@@ -58,51 +50,51 @@ class PostRepositoryImpl(private val postDao: PostDao,
         postDao.deleteAllPosts()
     }
 
+    // Fetch + update for WorkManager or initial load
+    override suspend fun fetchAndUpdatePosts(page: Int): Result<Boolean, Error> {
+        return withContext(Dispatchers.Main) {
+            try {
+                retry(times = 3, delayMillis = 2000) {
+                    val response = postApiService.getPosts(
+                        apiKey = "13398314-67b0a9023aca061e2950dbb5a",
+                        page = page
+                    )
 
-    // Fetch posts by likes from the API and store in the database
-    override suspend fun fetchPostsByLikes(page: Int): Result<Boolean, Error> {
-        // Check if we already have data for this page in the database
-        val existingPosts = postDao.getPostsByPageAndLikes(10, (page - 1) * 10).firstOrNull()
-        if (!existingPosts.isNullOrEmpty()) {
-            return Result.Success(true)  // If data exists, no need to fetch from API
-        }
+                    if (response.isSuccessful) {
+                        val posts = response.body()?.hits
+                            ?.filter { it.likes > 50 && it.comments > 50 }
+                            ?.map { it.toDomain().toEntity() }
+                            ?: emptyList()
 
-        return try {
-            // Fetch from API
-            withContext(Dispatchers.IO) {
-                val response = postApiService.getPosts(
-                    apiKey = "13398314-67b0a9023aca061e2950dbb5a",
-                    page = 777
-                )
-
-                // Filter posts by likes > 50
-                val posts = response.hits
-                    .filter { it.likes > 50 }  // Filter by likes > 50
-                    .map { it.toDomain().toPostByLikesEntity() } // Map to entity
-
-                // Insert filtered posts into the database (upsert)
-                postDao.upsertPostsByLikes(posts)
-                Result.Success(true)
+                        if (posts.isNotEmpty()) {
+                            postDao.deleteAllPosts() // Clear existing data for full refresh
+                            postDao.upsertPosts(posts)
+                            return@retry Result.Success(true)
+                        } else {
+                            throw Exception("Empty or invalid data received from server.")
+                        }
+                    } else {
+                        throw Exception("Failed to fetch posts: ${response.code()}")
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("PostRepository", "Error fetching and updating posts", e)
+                return@withContext Result.Error(DataError.Network.UNKNOWN)
             }
-
-        } catch (e: Exception) {
-            // Handle error and return result
-            Result.Error(DataError.Network.UNKNOWN)
         }
-    }
-
-    // Fetch paginated posts from the database (ordered by likes)
-    override fun getPostsByLikes(page: Int): Flow<List<Post>> {
-        val limit = 10  // Limit per page
-        val offset = (page - 1) * limit  // Calculate offset for pagination
-
-        // Fetch posts from the local database (cache)
-        return postDao.getPostsByPageAndLikes(limit, offset).map { it.toDomainPostByLike() }
-    }
-
-    // Function to delete all posts by likes (useful for refreshing data)
-    override suspend fun deleteAllPostsByLikes() {
-        postDao.deleteAllPostsByLike()  // Clear the postsByLikes table
     }
 }
 
+
+
+    // Simulated function to get some dummy posts (fake API response)
+    private fun fakePosts(page: Int): List<Post> {
+        return List(10) { index ->
+            Post(
+                id = (page * 10 + index).toString(),
+                comments = 555,
+                likes = 5055,
+                imageUrl = "https://pixabay.com/get/ga1fcbaef556c9d3f31e8ac41c4d6485a2f5fa82d16cb873f539320225bcdda1c2b16aebde37dc901fc166cbcc7a6539b513e1151f592975580b1640c54b915a0_640.jpg"
+            )
+        }
+    }

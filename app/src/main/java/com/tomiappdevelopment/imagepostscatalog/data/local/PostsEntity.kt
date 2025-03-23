@@ -11,12 +11,3 @@ data class PostEntity(
     val likes: Int,
     val imageUrl: String
 )
-
-@Entity(tableName = "postsByLikes")
-data class PostByLikesEntity(
-    @PrimaryKey
-    val id: String, // Unique identifier to avoid duplicates
-    val comments: Int,
-    val likes: Int,
-    val imageUrl: String
-)

@@ -9,15 +9,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconToggleButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -25,6 +22,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -37,13 +35,23 @@ fun PostsCatalogScreen(viewModel: PostsCatalogViewModel) {
     val state by viewModel.uiState.collectAsState()
     val errorState by viewModel.errorState.collectAsState(initial = "")
 
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    // Collect error state from ViewModel and display in a Snackbar
+    LaunchedEffect(key1 = errorState) {
+        if (errorState.isNotEmpty()) {
+            snackbarHostState.showSnackbar(errorState)
+        }
+    }
+
     val listState = rememberLazyListState()
 
     // Trigger "Load More" when the user reaches the bottom of the list
     LaunchedEffect(listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index) {
         val lastVisibleItemIndex = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index
+        // Check if the last visible item is at the end of the list
         if (lastVisibleItemIndex == state.posts.size - 1 && !state.isLoading) {
-            viewModel.onLoadMore()
+            viewModel.onLoadMore() // Trigger load more
         }
     }
 
@@ -51,11 +59,11 @@ fun PostsCatalogScreen(viewModel: PostsCatalogViewModel) {
         topBar = {
             TopAppBar(
                 title = { Text("Posts Catalog") },
-                colors = TopAppBarDefaults.smallTopAppBarColors(containerColor = MaterialTheme.colorScheme.primary),
-                actions = {
-                    ModeSwitch(viewModel)
-                }
+                colors = TopAppBarDefaults.smallTopAppBarColors(containerColor = MaterialTheme.colorScheme.primary)
             )
+        },
+        snackbarHost = {
+            SnackbarHost(hostState = snackbarHostState)
         },
         content = { paddingValues ->
             Box(
@@ -66,14 +74,6 @@ fun PostsCatalogScreen(viewModel: PostsCatalogViewModel) {
                 if (state.isLoading && state.posts.isEmpty()) {
                     CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
                 } else {
-                    if (errorState.isNotEmpty()) {
-                        Text(
-                            text = "Error: $errorState",
-                            color = Color.Red,
-                            modifier = Modifier.align(Alignment.Center)
-                        )
-                    }
-
                     LazyColumn(
                         state = listState,
                         modifier = Modifier.fillMaxSize()
@@ -100,24 +100,4 @@ fun PostsCatalogScreen(viewModel: PostsCatalogViewModel) {
             }
         }
     )
-}
-
-@Composable
-fun ModeSwitch(viewModel: PostsCatalogViewModel) {
-    val mode by viewModel.mode.collectAsState()
-
-    IconToggleButton(
-        checked = mode is UiState.LikesMode,
-        onCheckedChange = { viewModel.toggleMode() }
-    ) {
-        Icon(
-            imageVector = if (mode is UiState.LikesMode) {
-                Icons.Default.Favorite
-            } else {
-                Icons.Default.Refresh
-            },
-            contentDescription = if (mode is UiState.LikesMode) "Switch to Live Mode" else "Switch to Likes Mode",
-            tint = if (mode is UiState.LikesMode) Color.Red else MaterialTheme.colorScheme.onPrimary
-        )
-    }
 }

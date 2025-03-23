@@ -6,5 +6,4 @@ data class PostCatalogUiState(
     val posts: List<Post> = emptyList(),
     val page:Int=1,
     val isLoading: Boolean = false,
-    val error: String? = null
 )
