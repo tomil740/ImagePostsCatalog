@@ -1,8 +1,6 @@
 package com.tomiappdevelopment.imagepostscatalog.data
 
 import android.util.Log
-import com.tomiappdevelopment.imagepostscatalog.BuildConfig.API_KEY
-import com.tomiappdevelopment.imagepostscatalog.data.local.MetaDataEntity
 import com.tomiappdevelopment.imagepostscatalog.data.local.PostDao
 import com.tomiappdevelopment.imagepostscatalog.data.maper.toDomain
 import com.tomiappdevelopment.imagepostscatalog.data.maper.toEntity
@@ -12,10 +10,11 @@ import com.tomiappdevelopment.imagepostscatalog.domain.modules.Post
 import com.tomiappdevelopment.imagepostscatalog.domain.util.DataError
 import com.tomiappdevelopment.imagepostscatalog.domain.util.Error
 import com.tomiappdevelopment.imagepostscatalog.domain.util.Result
+import com.tomiappdevelopment.imagepostscatalog.domain.util.mapHttpErrorCodeToDataError
+import com.tomiappdevelopment.imagepostscatalog.domain.util.mapThrowableToDataError
 import com.tomiappdevelopment.imagepostscatalog.domain.util.retry
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 
@@ -27,23 +26,26 @@ class PostRepositoryImpl(private val postDao: PostDao,
         private const val PAGE_SIZE = 150
     }
 
-    override suspend fun fetchNewPage(page: Int): Result<Boolean, Error> {
-        return withContext(Dispatchers.Main) {
-            val existingMeta = postDao.getMetaDataObj()
-            val requiredSize = (page) * PAGE_SIZE
-            val existingPosts = postDao.getPostsFlow().firstOrNull()
-            if (!existingPosts.isNullOrEmpty() && existingPosts.size >= existingMeta.) {
-                return@withContext Result.Success(true) // Skip fetching if cached
-            }
+    //should be implemented with some all around error handling(in the fetchAndUpdatePosts function)
+    override suspend fun fetchNewPage(): Result<Boolean, Error> {
 
-            fetchAndUpdatePosts(page)
+        val currentPage = postDao.getPageCounter()?.fetchedPages ?: 0
+        val nextPage = currentPage + 1
+
+        return withContext(Dispatchers.IO) {
+            try {
+                return@withContext fetchAndUpdatePosts(nextPage)
+            } catch (e: Exception) {
+                // Handle any errors during the fetch process
+                return@withContext Result.Error(DataError.Network.UNKNOWN)
+            }
         }
     }
 
-    override fun getPostFlow(page: Int): Flow<List<Post>> {
+    override fun getPostsFlow(): Flow<List<Post>> {
 
         // Fetch posts from the local database (cache)
-        return postDao.getPostsFlow().map { it.toDomain() }
+        return postDao.getPostsByPage().map { it.toDomain() }
     }
 
     override suspend fun upsertPosts(posts: List<Post>) {
@@ -53,18 +55,21 @@ class PostRepositoryImpl(private val postDao: PostDao,
 
     override suspend fun deleteAllPosts() {
         // Delete all posts from the local database
-        postDao.clearAllData()
+        postDao.deleteAllPosts()
     }
 
-    override suspend fun fetchAndUpdatePosts(page: Int): Result<Boolean, Error> {
+    override suspend fun fetchAndUpdatePosts(pageArg: Int): Result<Boolean, Error> {
         return withContext(Dispatchers.IO) {
-            val thePage = if (page == -1) 1 else page
+            // Set page to 1 if it's the initial load or worker flag (-1 indicates a full refresh)
+            val page = if (pageArg == -1) 1 else pageArg
 
             try {
                 retry(times = 3, delayMillis = 2000) {
                     val response = postApiService.getPosts(
-                        apiKey = API_KEY, // Use a constant
-                        page = thePage
+                        apiKey = "13398314-67b0a9023aca061e2950dbb5a",
+                        perPage = PAGE_SIZE,
+                        editorsChoice = true,
+                        page = page
                     )
 
                     if (response.isSuccessful) {
@@ -74,36 +79,25 @@ class PostRepositoryImpl(private val postDao: PostDao,
                             ?: emptyList()
 
                         if (posts.isNotEmpty()) {
-                            val existingMeta = postDao.getMetaDataObj() ?: MetaDataEntity()
-                            val updatedMeta = existingMeta.copy(
-                                lastFetchedPage = thePage,
-                                filteredSize = posts.size,
-                                totalFetchedSize = response.body()?.hits?.size ?: 0,
-                                lastUpdateTime = System.currentTimeMillis()
-                            )
-
-                            postDao.upsertPostsWithMetaData(
-                                posts,
-                                updatedMeta
-                            )
-
-                            return@retry Result.Success(true)
-                        } else if (page > 0) {
-                            // ✅ Edge case: Partial data on valid page → Attempt next page if it's within limit
-                            if (thePage < 2) {
-                                fetchAndUpdatePosts(thePage + 1)
+                            if (pageArg == -1) {
+                                postDao.deleteAllPosts() // Clear existing data for full refresh
                             }
-                            throw Exception("Empty or invalid data received from server.")
+                            postDao.insertPostsAndUpdatePageCounter(posts, pageNumber = page)
+                            return@retry Result.Success(true)
                         } else {
                             throw Exception("Empty or invalid data received from server.")
                         }
                     } else {
-                        throw Exception("Failed to fetch posts: ${response.code()}")
+
+                        return@retry Result.Error(mapHttpErrorCodeToDataError(response.code()))
                     }
                 }
             } catch (e: Exception) {
                 Log.e("PostRepository", "Error fetching and updating posts", e)
-                return@withContext Result.Error(DataError.Network.UNKNOWN)
+
+                // If it's an exception, map it to a network error
+                val error = mapThrowableToDataError(e)
+                return@withContext Result.Error(error)
             }
         }
     }

@@ -7,47 +7,36 @@ import androidx.room.Query
 import androidx.room.Transaction
 import kotlinx.coroutines.flow.Flow
 
-
 @Dao
 interface PostDao {
 
-    // Get posts by page, ordered by likes in descending order, with pagination
-    @Query("SELECT * FROM posts ORDER BY likes")
-    fun getPostsFlow(): Flow<List<PostEntity>>
+    @Query("SELECT * FROM posts ORDER BY likes DESC")
+    fun getPostsByPage(): Flow<List<PostEntity>>
 
-    // Delete all posts (for sync)
     @Query("DELETE FROM posts")
     suspend fun deleteAllPosts()
 
-    // Insert or update postEntities (upsert)
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertPosts(postEntities: List<PostEntity>)
 
-    // Metadata handling functions
-    @Query("DELETE FROM meta_data")
-    suspend fun deleteAllMetaData()
-
-    @Query("SELECT * FROM meta_data")
-    fun getMetaDataObj(): MetaDataEntity?
-
-    // Insert or update metadata (upsert)
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun updateMetaData(metaDataEntity: MetaDataEntity)
-
-    // 👉 **Transaction to handle data + metadata consistency**
     @Transaction
-    suspend fun upsertPostsWithMetaData(
-        postEntities: List<PostEntity>,
-        metaDataEntity: MetaDataEntity
-    ) {
+    suspend fun insertPostsAndUpdatePageCounter(postEntities: List<PostEntity>, pageNumber: Int) {
         upsertPosts(postEntities)
-        updateMetaData(metaDataEntity)
+
+        val pageCounter = getPageCounter()
+        if (pageCounter != null) {
+            updateFetchedPageCount(pageNumber)
+        } else {
+            insertPageCounter(PageCounterEntity(id = 0, fetchedPages = pageNumber))
+        }
     }
 
-    // 👉 **Transaction to clear data and metadata together**
-    @Transaction
-    suspend fun clearAllData() {
-        deleteAllPosts()
-        deleteAllMetaData()
-    }
+    @Query("UPDATE page_counter SET fetchedPages = :pageNumber WHERE id = 0")
+    suspend fun updateFetchedPageCount(pageNumber: Int)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertPageCounter(pageCounter: PageCounterEntity)
+
+    @Query("SELECT * FROM page_counter WHERE id = 0")
+    suspend fun getPageCounter(): PageCounterEntity?
 }

@@ -17,7 +17,6 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
 
-@OptIn(ExperimentalCoroutinesApi::class)
 class PostsCatalogViewModel(
     private val postsRepo:PostRepository
 ) : ViewModel() {
@@ -29,24 +28,21 @@ class PostsCatalogViewModel(
     private val _errorState = MutableSharedFlow<String>(replay = 1)
     val errorState: SharedFlow<String> get() = _errorState
 
-    private val _currentPage = MutableStateFlow<Int>(1)
-
     init {
         // Collect the current page and fetch posts accordingly
         // Assuming you have a _currentPage Flow and a getPostsByPage function from the repository
         // Make sure you keep the state in memory across configuration changes
         viewModelScope.launch {
-            onLoadMore()
-            _currentPage
-                .flatMapLatest { page ->
-                    Log.i("hay", "new page $page")
-                    postsRepo.getPostsByPage(page)
-                }
-                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())  // Keep data in memory with a default value
-                .collect { newPosts ->
-                    // Update UI state with the new posts
-                    _uiState.update { it.copy(posts = it.posts + newPosts) }
-                }
+            postsRepo.getPostsFlow().collect{ posts->
+                _uiState.update { it.copy(posts = posts) }
+            }
+        }
+        viewModelScope.launch {
+            //check if it is first startup
+            delay(500)
+            if (uiState.value.posts.isEmpty()){
+                onLoadMore()
+            }
         }
     }
 
@@ -57,20 +53,16 @@ class PostsCatalogViewModel(
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
 
-            // Check if data fetch is needed and attempt to fetch the new page
-            val result = postsRepo.fetchNewPage(_currentPage.value + 1)
+            val result = postsRepo.fetchNewPage()
 
             when (result) {
                 is Result.Success -> {
-                    // Increment the page after successful fetch
-                    delay(1000)
-                    _currentPage.update { it + 1 }
                     _uiState.update { it.copy(isLoading = false) }
                 }
                 is Result.Error -> {
                     // Handle error by emitting it through errorState
                     _uiState.update { it.copy(isLoading = false) }
-                    _errorState.emit("Failed to load more posts. Please try again.")
+                    _errorState.emit(result.error.toString())
                 }
             }
         }
