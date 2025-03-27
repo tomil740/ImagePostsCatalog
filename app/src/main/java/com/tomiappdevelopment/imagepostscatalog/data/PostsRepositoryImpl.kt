@@ -1,6 +1,8 @@
 package com.tomiappdevelopment.imagepostscatalog.data
 
 import android.util.Log
+import com.tomiappdevelopment.imagepostscatalog.BuildConfig.API_KEY
+import com.tomiappdevelopment.imagepostscatalog.data.local.MetaDataEntity
 import com.tomiappdevelopment.imagepostscatalog.data.local.PostDao
 import com.tomiappdevelopment.imagepostscatalog.data.maper.toDomain
 import com.tomiappdevelopment.imagepostscatalog.data.maper.toEntity
@@ -21,10 +23,16 @@ class PostRepositoryImpl(private val postDao: PostDao,
                          private val postApiService: PostApiService
 ): PostRepository {
 
+    companion object {
+        private const val PAGE_SIZE = 150
+    }
+
     override suspend fun fetchNewPage(page: Int): Result<Boolean, Error> {
         return withContext(Dispatchers.Main) {
-            val existingPosts = postDao.getPostsByPage(10, (page - 1) * 10).firstOrNull()
-            if (!existingPosts.isNullOrEmpty()) {
+            val existingMeta = postDao.getMetaDataObj()
+            val requiredSize = (page) * PAGE_SIZE
+            val existingPosts = postDao.getPostsFlow().firstOrNull()
+            if (!existingPosts.isNullOrEmpty() && existingPosts.size >= existingMeta.) {
                 return@withContext Result.Success(true) // Skip fetching if cached
             }
 
@@ -32,12 +40,10 @@ class PostRepositoryImpl(private val postDao: PostDao,
         }
     }
 
-    override fun getPostsByPage(page: Int): Flow<List<Post>> {
-        val limit = 10  // Limit per page
-        val offset = (page - 1) * limit  // Calculate offset for pagination
+    override fun getPostFlow(page: Int): Flow<List<Post>> {
 
         // Fetch posts from the local database (cache)
-        return postDao.getPostsByPage(limit, offset).map { it.toDomain() }
+        return postDao.getPostsFlow().map { it.toDomain() }
     }
 
     override suspend fun upsertPosts(posts: List<Post>) {
@@ -47,17 +53,18 @@ class PostRepositoryImpl(private val postDao: PostDao,
 
     override suspend fun deleteAllPosts() {
         // Delete all posts from the local database
-        postDao.deleteAllPosts()
+        postDao.clearAllData()
     }
 
-    // Fetch + update for WorkManager or initial load
     override suspend fun fetchAndUpdatePosts(page: Int): Result<Boolean, Error> {
-        return withContext(Dispatchers.Main) {
+        return withContext(Dispatchers.IO) {
+            val thePage = if (page == -1) 1 else page
+
             try {
                 retry(times = 3, delayMillis = 2000) {
                     val response = postApiService.getPosts(
-                        apiKey = "13398314-67b0a9023aca061e2950dbb5a",
-                        page = page
+                        apiKey = API_KEY, // Use a constant
+                        page = thePage
                     )
 
                     if (response.isSuccessful) {
@@ -67,9 +74,26 @@ class PostRepositoryImpl(private val postDao: PostDao,
                             ?: emptyList()
 
                         if (posts.isNotEmpty()) {
-                            postDao.deleteAllPosts() // Clear existing data for full refresh
-                            postDao.upsertPosts(posts)
+                            val existingMeta = postDao.getMetaDataObj() ?: MetaDataEntity()
+                            val updatedMeta = existingMeta.copy(
+                                lastFetchedPage = thePage,
+                                filteredSize = posts.size,
+                                totalFetchedSize = response.body()?.hits?.size ?: 0,
+                                lastUpdateTime = System.currentTimeMillis()
+                            )
+
+                            postDao.upsertPostsWithMetaData(
+                                posts,
+                                updatedMeta
+                            )
+
                             return@retry Result.Success(true)
+                        } else if (page > 0) {
+                            // ✅ Edge case: Partial data on valid page → Attempt next page if it's within limit
+                            if (thePage < 2) {
+                                fetchAndUpdatePosts(thePage + 1)
+                            }
+                            throw Exception("Empty or invalid data received from server.")
                         } else {
                             throw Exception("Empty or invalid data received from server.")
                         }
