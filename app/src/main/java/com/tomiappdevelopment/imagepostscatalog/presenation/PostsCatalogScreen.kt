@@ -58,7 +58,7 @@ fun PostsCatalogScreen(viewModel: PostsCatalogViewModel) {
         topBar = {
             TopAppBar(
                 title = { Text("Posts Catalog") },
-                colors = TopAppBarDefaults.smallTopAppBarColors(containerColor = MaterialTheme.colorScheme.primary)
+                colors = TopAppBarDefaults.mediumTopAppBarColors(containerColor = MaterialTheme.colorScheme.primary)
             )
         },
         snackbarHost = {
