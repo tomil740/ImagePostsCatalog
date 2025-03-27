@@ -23,7 +23,7 @@ class PostRepositoryImpl(private val postDao: PostDao,
 ): PostRepository {
 
     companion object {
-        private const val PAGE_SIZE = 350
+        private const val PAGE_SIZE = 200
     }
 
     //should be implemented with some all around error handling(in the fetchAndUpdatePosts function)
