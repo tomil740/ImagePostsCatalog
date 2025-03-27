@@ -26,7 +26,6 @@ class PostRepositoryImpl(private val postDao: PostDao,
         private const val PAGE_SIZE = 200
     }
 
-    //should be implemented with some all around error handling(in the fetchAndUpdatePosts function)
     override suspend fun fetchNewPage(): Result<Boolean, Error> {
 
         val currentPage = postDao.getPageCounter()?.fetchedPages ?: 0
