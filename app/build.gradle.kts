@@ -16,7 +16,7 @@ val pixabayApiKey: String = localProperties["api_key"] as String
 
 android {
     namespace = "com.tomiappdevelopment.imagepostscatalog"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.tomiappdevelopment.imagepostscatalog"

@@ -25,7 +25,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.tomiappdevelopment.imagepostscatalog.presenation.components.PostItem
 
@@ -59,7 +58,7 @@ fun PostsCatalogScreen(viewModel: PostsCatalogViewModel) {
         topBar = {
             TopAppBar(
                 title = { Text("Posts Catalog") },
-                colors = TopAppBarDefaults.smallTopAppBarColors(containerColor = MaterialTheme.colorScheme.primary)
+                colors = TopAppBarDefaults.mediumTopAppBarColors(containerColor = MaterialTheme.colorScheme.primary)
             )
         },
         snackbarHost = {

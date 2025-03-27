@@ -3,15 +3,13 @@ package com.tomiappdevelopment.imagepostscatalog.domain
 import com.tomiappdevelopment.imagepostscatalog.domain.modules.Post
 import com.tomiappdevelopment.imagepostscatalog.domain.util.Error
 import com.tomiappdevelopment.imagepostscatalog.domain.util.Result
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
 
 interface PostRepository {
 
-    suspend fun fetchNewPage(page: Int): Result<Boolean, Error>
+    suspend fun fetchNewPage(): Result<Boolean, Error>
 
-    fun getPostsByPage(page: Int): Flow<List<Post>>
+    fun getPostsFlow(): Flow<List<Post>>
 
     suspend fun upsertPosts(posts: List<Post>)
 

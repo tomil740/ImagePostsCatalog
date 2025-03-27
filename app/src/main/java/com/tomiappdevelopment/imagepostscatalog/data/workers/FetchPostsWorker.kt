@@ -19,15 +19,15 @@ class FetchPostsWorker(
     override suspend fun doWork(): ListenableWorker.Result {
         return withContext(Dispatchers.IO) {
             try {
-                // Perform the fetch operation and return the appropriate result
-                val result = postRepository.fetchAndUpdatePosts(12)
+                // flag -1 as a worker to init the data
+                val result = postRepository.fetchAndUpdatePosts(-1)
 
                 // Handle the result and map it to ListenableWorker.Result
                 when (result) {
 
-                    is com.tomiappdevelopment.imagepostscatalog.domain.util.Result.Error ->{ Result.success()}
+                    is com.tomiappdevelopment.imagepostscatalog.domain.util.Result.Success ->{ Result.success()}
 
-                    is com.tomiappdevelopment.imagepostscatalog.domain.util.Result.Success -> { Result.retry()}
+                    is com.tomiappdevelopment.imagepostscatalog.domain.util.Result.Error -> { Result.retry()}
                 }
             } catch (e: Exception) {
                 // In case of exception, retry the work
