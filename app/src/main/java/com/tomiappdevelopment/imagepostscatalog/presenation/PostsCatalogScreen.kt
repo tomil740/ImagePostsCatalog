@@ -27,19 +27,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.tomiappdevelopment.imagepostscatalog.presenation.components.PostItem
+import kotlinx.coroutines.flow.consumeAsFlow
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PostsCatalogScreen(viewModel: PostsCatalogViewModel) {
     val state by viewModel.uiState.collectAsState()
-    val errorState by viewModel.errorState.collectAsState(initial = "")
 
     val snackbarHostState = remember { SnackbarHostState() }
 
     // Collect error state from ViewModel and display in a Snackbar
-    LaunchedEffect(key1 = errorState) {
-        if (errorState.isNotEmpty()) {
-            snackbarHostState.showSnackbar(errorState)
+    LaunchedEffect(viewModel.errorState) {
+        viewModel.errorState.consumeAsFlow().collect {
+            snackbarHostState.showSnackbar(it)
         }
     }
 

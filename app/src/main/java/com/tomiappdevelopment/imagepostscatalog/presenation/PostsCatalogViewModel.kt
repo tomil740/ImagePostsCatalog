@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import com.tomiappdevelopment.imagepostscatalog.domain.util.Result
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -25,8 +26,8 @@ class PostsCatalogViewModel(
     val uiState: StateFlow<PostCatalogUiState> get() = _uiState
 
     // SharedFlow for error messages
-    private val _errorState = MutableSharedFlow<String>(replay = 1)
-    val errorState: SharedFlow<String> get() = _errorState
+    private val _errorState = Channel<String>()
+    val errorState: Channel<String> get() = _errorState
 
     init {
         // Collect the current page and fetch posts accordingly
@@ -58,11 +59,12 @@ class PostsCatalogViewModel(
             when (result) {
                 is Result.Success -> {
                     _uiState.update { it.copy(isLoading = false) }
+                    _errorState.send("successfully fetched new data")
                 }
                 is Result.Error -> {
                     // Handle error by emitting it through errorState
                     _uiState.update { it.copy(isLoading = false) }
-                    _errorState.emit(result.error.toString())
+                    _errorState.send(result.error.toString())
                 }
             }
         }

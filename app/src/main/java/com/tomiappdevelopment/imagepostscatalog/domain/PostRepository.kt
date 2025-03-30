@@ -1,6 +1,7 @@
 package com.tomiappdevelopment.imagepostscatalog.domain
 
 import com.tomiappdevelopment.imagepostscatalog.domain.modules.Post
+import com.tomiappdevelopment.imagepostscatalog.domain.util.DataError
 import com.tomiappdevelopment.imagepostscatalog.domain.util.Error
 import com.tomiappdevelopment.imagepostscatalog.domain.util.Result
 import kotlinx.coroutines.flow.Flow
@@ -15,6 +16,6 @@ interface PostRepository {
 
     suspend fun deleteAllPosts()
 
-    suspend fun fetchAndUpdatePosts(page: Int): Result<Boolean, Error>
+    suspend fun fetchAndUpdatePosts(page: Int): Result<Boolean, DataError>
 
 }

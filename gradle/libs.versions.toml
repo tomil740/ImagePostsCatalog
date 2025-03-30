@@ -1,6 +1,6 @@
 [versions]
 agp = "8.9.1"
-kotlin = "1.9.0"
+kotlin = "1.9.22"
 coreKtx = "1.15.0"
 junit = "4.13.2"
 junitVersion = "1.2.1"
@@ -15,6 +15,7 @@ koin = "3.5.3"
 room = "2.6.1"
 retrofit = "2.9.0"
 gson = "2.9.0"
+ksp = "2.0.0"
 
 
 
@@ -48,6 +49,9 @@ koin-androidx-compose = { group = "io.insert-koin", name = "koin-androidx-compos
 
 retrofit = { group = "com.squareup.retrofit2", name = "retrofit", version.ref = "retrofit" }
 converter-gson = { group = "com.squareup.retrofit2", name = "converter-gson", version.ref = "retrofit" }
+
+ksp = { module = "com.google.devtools.ksp:symbol-processing-api", version.ref = "ksp" }
+kotlin = { module = "org.jetbrains.kotlin:kotlin-stdlib", version.ref = "kotlin" }
 
 
 [plugins]

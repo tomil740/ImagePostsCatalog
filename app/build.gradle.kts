@@ -1,12 +1,11 @@
 import com.android.manifmerger.Actions.load
 import java.util.Properties
 
-
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.jetbrains.kotlin.android)
 
-    id("kotlin-kapt")
+    id("com.google.devtools.ksp")
 }
 val localProperties = Properties().apply {
     load(rootProject.file("local.properties").inputStream())
@@ -67,7 +66,7 @@ android {
     }
 
     composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.1"
+        kotlinCompilerExtensionVersion = "1.5.10"
     }
 
     packaging {
@@ -100,7 +99,8 @@ dependencies {
     // Room Database
     implementation(libs.room.ktx)
     implementation(libs.room.runtime)
-    kapt(libs.room.compiler) // Use kapt for room-compiler!
+    ksp(libs.room.compiler) // Use kapt for room-compiler!
+
 
     implementation(libs.retrofit)
     implementation(libs.converter.gson)

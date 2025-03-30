@@ -57,13 +57,12 @@ class PostRepositoryImpl(private val postDao: PostDao,
         postDao.deleteAllPosts()
     }
 
-    override suspend fun fetchAndUpdatePosts(pageArg: Int): Result<Boolean, Error> {
+    override suspend fun fetchAndUpdatePosts(pageArg: Int): Result<Boolean, DataError> {
         return withContext(Dispatchers.IO) {
             // Set page to 1 if it's the initial load or worker flag (-1 indicates a full refresh)
             val page = if (pageArg == -1) 1 else pageArg
 
             try {
-                retry(times = 3, delayMillis = 2000) {
                     val response = postApiService.getPosts(
                         apiKey = "13398314-67b0a9023aca061e2950dbb5a",
                         perPage = PAGE_SIZE,
@@ -82,15 +81,14 @@ class PostRepositoryImpl(private val postDao: PostDao,
                                 postDao.deleteAllPosts() // Clear existing data for full refresh
                             }
                             postDao.insertPostsAndUpdatePageCounter(posts, pageNumber = page)
-                            return@retry Result.Success(true)
+                            return@withContext Result.Success(true)
                         } else {
                             throw Exception("Empty or invalid data received from server.")
                         }
                     } else {
 
-                        return@retry Result.Error(mapHttpErrorCodeToDataError(response.code()))
+                        return@withContext Result.Error(mapHttpErrorCodeToDataError(response.code()))
                     }
-                }
             } catch (e: Exception) {
                 Log.e("PostRepository", "Error fetching and updating posts", e)
 

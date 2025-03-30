@@ -45,8 +45,8 @@ fun getInitialDelayUntil2AM(): Long {
     val targetTime = Calendar.getInstance()
 
     // Set target time to 2 AM
-    targetTime.set(Calendar.HOUR_OF_DAY, 2)
-    targetTime.set(Calendar.MINUTE, 0)
+    targetTime.set(Calendar.HOUR_OF_DAY, 13)
+    targetTime.set(Calendar.MINUTE, 19)
     targetTime.set(Calendar.SECOND, 0)
     targetTime.set(Calendar.MILLISECOND, 0)
 
