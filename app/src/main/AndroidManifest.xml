@@ -29,14 +29,6 @@
             </intent-filter>
         </activity>
 
-        <receiver
-            android:name=".BroadcastReceiver.FetchPostsBroadcastReceiver"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="com.tomiappdevelopment.imagepostscatalog.SYNC_COMPLETE" />
-            </intent-filter>
-        </receiver>
-
     </application>
 
 </manifest>

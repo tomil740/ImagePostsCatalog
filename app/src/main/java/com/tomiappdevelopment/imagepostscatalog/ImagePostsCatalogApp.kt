@@ -4,20 +4,13 @@ import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
-import android.content.IntentFilter
 import android.os.Build
 import androidx.annotation.RequiresApi
-import androidx.work.BackoffPolicy
-import androidx.work.OneTimeWorkRequestBuilder
-import androidx.work.WorkManager
-import com.tomiappdevelopment.imagepostscatalog.BroadcastReceiver.FetchPostsBroadcastReceiver
-import com.tomiappdevelopment.imagepostscatalog.data.workers.FetchPostsWorker
 import com.tomiappdevelopment.imagepostscatalog.data.workers.scheduleFetchPostsWorker
 import com.tomiappdevelopment.imagepostscatalog.di.appModule
 import org.koin.android.ext.koin.androidContext
 import org.koin.android.ext.koin.androidLogger
 import org.koin.core.context.startKoin
-import java.util.concurrent.TimeUnit
 
 class ImagePostsCatalogApp: Application() {
 

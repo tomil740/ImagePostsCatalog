@@ -8,6 +8,8 @@ import androidx.work.CoroutineWorker
 import androidx.work.ListenableWorker
 import androidx.work.WorkerParameters
 import com.tomiappdevelopment.imagepostscatalog.data.maper.toWorkerResult
+import com.tomiappdevelopment.imagepostscatalog.data.notifications.showFailureNotification
+import com.tomiappdevelopment.imagepostscatalog.data.notifications.showSuccessNotification
 import com.tomiappdevelopment.imagepostscatalog.domain.PostRepository
 import com.tomiappdevelopment.imagepostscatalog.domain.util.DataError
 import kotlinx.coroutines.Dispatchers
@@ -38,12 +40,12 @@ class FetchPostsWorker(
                 when (result) {
 
                     is com.tomiappdevelopment.imagepostscatalog.domain.util.Result.Success ->{
-                        sendBroadcast("success")
+                        showSuccessNotification(applicationContext)
                         Result.success()
                     }
 
                     is com.tomiappdevelopment.imagepostscatalog.domain.util.Result.Error -> {
-                        sendBroadcast("failure", result.error.toString())
+                        showFailureNotification(applicationContext,result.error.toString())
                         result.error.toWorkerResult()
                     }
                 }
